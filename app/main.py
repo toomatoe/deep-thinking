@@ -1,4 +1,6 @@
 
+
+import uvicorn
 from fastapi import FastAPI
 from app.models import TurnRequest, TurnResponse
 import uuid
@@ -14,6 +16,11 @@ sessions = {}
 async def create_turn(request: TurnRequest):
     """Ask one Socratic question based on user input"""
     user_msg = request.user_msg.lower()
+
+    # Save user message to file for adaptation
+    with open("user_messages.txt", "a", encoding="utf-8") as f:
+        f.write(user_msg + "\n")
+
     if "want" in user_msg or "goal" in user_msg:
         question = "What specifically would success look like?"
         next_phase = "clarify"
@@ -42,5 +49,4 @@ async def create_session():
 
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
