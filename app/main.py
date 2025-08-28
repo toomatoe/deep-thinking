@@ -27,6 +27,9 @@ async def create_turn(request: TurnRequest):
     elif "because" in user_msg or "think" in user_msg:
         question = "What assumptions are you making about that?"
         next_phase = "assumptions"
+    elif "love" in user_msg or "like" in user_msg:
+        question = "What do you love about this?"
+        next_phase = "appreciate"
     else:
         question = "What do you mean by that exactly?"
         next_phase = "clarify"
