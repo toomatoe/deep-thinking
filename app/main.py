@@ -1,3 +1,5 @@
+# Import scikit-learn
+import sklearn
 
 
 import uvicorn
