@@ -32,7 +32,7 @@ def fit_vectorizer_and_kmeans():
     global vectorizer, kmeans
     messages = load_user_messages()
     if len(messages) < NUM_CLUSTERS:
-        return  # Not enough data to cluster
+        return  
     vectorizer = TfidfVectorizer()
     X = vectorizer.fit_transform(messages)
     kmeans = KMeans(n_clusters=NUM_CLUSTERS, n_init=10, random_state=42)
@@ -43,7 +43,7 @@ def get_cluster_label(user_msg):
     if vectorizer is None or kmeans is None:
         fit_vectorizer_and_kmeans()
     if vectorizer is None or kmeans is None:
-        return None  # Not enough data
+        return None  
     X = vectorizer.transform([user_msg])
     return kmeans.predict(X)[0]
 
