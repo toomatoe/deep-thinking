@@ -1,11 +1,8 @@
-
-
 # scikit-learn imports for personalization
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
 import os
-
-
+import sqlite3
 import uvicorn
 from fastapi import FastAPI
 from app.models import TurnRequest, TurnResponse
@@ -20,19 +17,45 @@ sessions = {}
 
 vectorizer = None
 kmeans = None
-NUM_CLUSTERS = 3  
+NUM_CLUSTERS = 3
+
+DB_PATH = "user_messages.db"
+
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS user_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT,
+            user_msg TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+init_db()
 
 def load_user_messages():
-    if not os.path.exists("user_messages.txt"):
-        return []
-    with open("user_messages.txt", "r", encoding="utf-8") as f:
-        return [line.strip() for line in f if line.strip()]
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT user_msg FROM user_messages")
+    messages = [row[0] for row in c.fetchall()]
+    conn.close()
+    return messages
+
+def save_user_message(session_id, user_msg):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("INSERT INTO user_messages (session_id, user_msg) VALUES (?, ?)", (session_id, user_msg))
+    conn.commit()
+    conn.close()
 
 def fit_vectorizer_and_kmeans():
     global vectorizer, kmeans
     messages = load_user_messages()
     if len(messages) < NUM_CLUSTERS:
-        return  
+        return
     vectorizer = TfidfVectorizer()
     X = vectorizer.fit_transform(messages)
     kmeans = KMeans(n_clusters=NUM_CLUSTERS, n_init=10, random_state=42)
@@ -43,21 +66,14 @@ def get_cluster_label(user_msg):
     if vectorizer is None or kmeans is None:
         fit_vectorizer_and_kmeans()
     if vectorizer is None or kmeans is None:
-        return None  
+        return None
     X = vectorizer.transform([user_msg])
     return kmeans.predict(X)[0]
 
-
 @app.post("/turn", response_model=TurnResponse)
 async def create_turn(request: TurnRequest):
-    """Ask one Socratic question based on user input"""
     user_msg = request.user_msg.lower()
-
-   #User messages
-    with open("user_messages.txt", "a", encoding="utf-8") as f:
-        f.write(user_msg + "\n")
-
-    # Personalize
+    save_user_message(request.session_id, user_msg)
     cluster = get_cluster_label(user_msg)
     if cluster == 0:
         question = "What specifically would success look like for you?"
@@ -69,7 +85,6 @@ async def create_turn(request: TurnRequest):
         question = "What do you love about this?"
         next_phase = "appreciate"
     else:
-        # Fallback to keyword-based logic if not enough data
         if "want" in user_msg or "goal" in user_msg:
             question = "What specifically would success look like?"
             next_phase = "clarify"
@@ -90,15 +105,11 @@ async def create_turn(request: TurnRequest):
     })
     return TurnResponse(question=question, next_phase=next_phase)
 
-
 @app.post("/sessions")
 async def create_session():
-    """Create new session"""
     session_id = str(uuid.uuid4())
     sessions[session_id] = []
     return {"session_id": session_id}
-
-
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
