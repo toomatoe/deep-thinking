@@ -1,19 +1,38 @@
-# scikit-learn imports for personalization
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.cluster import KMeans
+
+# Cleaned and organized imports
 import os
+import random
 import sqlite3
+import uuid
+
 import uvicorn
 from fastapi import FastAPI
 from app.models import TurnRequest, TurnResponse
-import uuid
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.cluster import KMeans
 
+CLUSTER_QUESTIONS = {
+    0: [
+        "What specifically would success look like for you?",
+        "How will you know when you've achieved that?",
+        "What outcome are you hoping for?"
+    ],
+
+    1: [
+        "What assumptions are you making about that?",
+        "Is there another way to look at this?",
+        "What evidence do you have that supports your thinking?"
+    ],
+    2: [
+        "What do you love about this?",
+        "What excites you most about this?",
+        "What keeps you motivated here?"
+    ]
+}
 app = FastAPI(title="Socratic Coach MVP")
-
 
 # In-memory storage for MVP
 sessions = {}
-
 
 vectorizer = None
 kmeans = None
