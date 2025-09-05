@@ -11,8 +11,7 @@ from app.models import TurnRequest, TurnResponse
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
 
-CLUSTER_QUESTIONS = {
-    0: [
+CLUSTER_QUESTIONS = {0: [
         "What specifically would success look like for you?",
         "How will you know when you've achieved that?",
         "What outcome are you hoping for?"
@@ -37,6 +36,7 @@ sessions = {}
 vectorizer = None
 kmeans = None
 NUM_CLUSTERS = 3
+
 
 DB_PATH = "user_messages.db"
 
@@ -94,15 +94,15 @@ async def create_turn(request: TurnRequest):
     user_msg = request.user_msg.lower()
     save_user_message(request.session_id, user_msg)
     cluster = get_cluster_label(user_msg)
-    if cluster == 0:
-        question = "What specifically would success look like for you?"
-        next_phase = "clarify"
-    elif cluster == 1:
-        question = "What assumptions are you making about that?"
-        next_phase = "assumptions"
-    elif cluster == 2:
-        question = "What do you love about this?"
-        next_phase = "appreciate"
+    if cluster in CLUSTER_QUESTIONS:
+        question = random.choice(CLUSTER_QUESTIONS[cluster])
+        if cluster == 0:
+            next_phase = "clarify"
+        elif cluster == 1:
+            next_phase = "assumptions"
+        elif cluster == 2:
+            next_phase = "appreciate"
+   
     else:
         if "want" in user_msg or "goal" in user_msg:
             question = "What specifically would success look like?"
