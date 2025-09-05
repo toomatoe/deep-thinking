@@ -1,5 +1,5 @@
 
-# Cleaned and organized imports
+
 import os
 import random
 import sqlite3
