@@ -1,5 +1,3 @@
-
-
 import os
 import random
 import sqlite3
@@ -48,6 +46,12 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id TEXT,
             user_msg TEXT
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS user_profiles (
+            session_id TEXT PRIMARY KEY,
+            username TEXT
         )
     """)
     conn.commit()
