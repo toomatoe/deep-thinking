@@ -98,15 +98,24 @@ async def create_turn(request: TurnRequest):
     user_msg = request.user_msg.lower()
     save_user_message(request.session_id, user_msg)
     cluster = get_cluster_label(user_msg)
+
+    # Track questions already asked in this session
+    if request.session_id not in sessions:
+        sessions[request.session_id] = []
+    asked_questions = {entry["ai"] for entry in sessions[request.session_id]}
+
     if cluster in CLUSTER_QUESTIONS:
-        question = random.choice(CLUSTER_QUESTIONS[cluster])
+        possible_questions = [q for q in CLUSTER_QUESTIONS[cluster] if q not in asked_questions]
+        if not possible_questions:
+            # If all questions have been asked, allow repeats
+            possible_questions = CLUSTER_QUESTIONS[cluster]
+        question = random.choice(possible_questions)
         if cluster == 0:
             next_phase = "clarify"
         elif cluster == 1:
             next_phase = "assumptions"
         elif cluster == 2:
             next_phase = "appreciate"
-   
     else:
         if "want" in user_msg or "goal" in user_msg:
             question = "What specifically would success look like?"
@@ -120,8 +129,6 @@ async def create_turn(request: TurnRequest):
         else:
             question = "What do you mean by that exactly?"
             next_phase = "clarify"
-    if request.session_id not in sessions:
-        sessions[request.session_id] = []
     sessions[request.session_id].append({
         "user": request.user_msg,
         "ai": question
