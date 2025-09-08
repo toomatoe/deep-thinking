@@ -4,7 +4,7 @@ import sqlite3
 import uuid
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Body
 from app.models import TurnRequest, TurnResponse
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
@@ -134,5 +134,26 @@ async def create_session():
     sessions[session_id] = []
     return {"session_id": session_id}
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+@app.post("/set_username")
+async def set_username(session_id: str = Body(...), username: str = Body(...)):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        "INSERT OR REPLACE INTO user_profiles (session_id, username) VALUES (?, ?)",
+        (session_id, username)
+    )
+    conn.commit()
+    conn.close()
+    return {"session_id": session_id, "username": username}
+
+@app.get("/get_username/{session_id}")
+async def get_username(session_id: str):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT username FROM user_profiles WHERE session_id = ?", (session_id,))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return {"session_id": session_id, "username": row[0]}
+    else:
+        return {"session_id": session_id, "username": None}
