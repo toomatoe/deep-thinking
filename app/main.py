@@ -9,6 +9,9 @@ from app.models import TurnRequest, TurnResponse
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
 
+from transformers import pipeline
+
+question_generator = pipeline("text-generation", model="distilgpt2")
 CLUSTER_QUESTIONS = {0: [
         "What specifically would success look like for you?",
         "How will you know when you've achieved that?",
@@ -93,17 +96,24 @@ def get_cluster_label(user_msg):
     X = vectorizer.transform([user_msg])
     return kmeans.predict(X)[0]
 
+def generate_question(user_msg):
+    prompt = f'Ask a Socratic question about: {user_msg}\nQuestion:'
+    result = question_generator(prompt, max_length=50, num_return_sequences=1)
+    return result[0]['generated_text'].split("Question:")[-1].strip()
+
 @app.post("/turn", response_model=TurnResponse)
 async def create_turn(request: TurnRequest):
     user_msg = request.user_msg.lower()
     save_user_message(request.session_id, user_msg)
+    question = generate_question(user_msg)
+    next_phase = "contextual"  # Or set this based on your logic
     cluster = get_cluster_label(user_msg)
 
     # Track questions already asked in this session
     if request.session_id not in sessions:
         sessions[request.session_id] = []
     asked_questions = {entry["ai"] for entry in sessions[request.session_id]}
-
+"""
     if cluster in CLUSTER_QUESTIONS:
         possible_questions = [q for q in CLUSTER_QUESTIONS[cluster] if q not in asked_questions]
         if not possible_questions:
@@ -134,7 +144,7 @@ async def create_turn(request: TurnRequest):
         "ai": question
     })
     return TurnResponse(question=question, next_phase=next_phase)
-
+"""
 @app.post("/sessions")
 async def create_session():
     session_id = str(uuid.uuid4())
