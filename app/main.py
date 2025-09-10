@@ -3,6 +3,7 @@ import random
 import sqlite3
 import uuid
 
+
 import uvicorn
 from fastapi import FastAPI, Body
 from app.models import TurnRequest, TurnResponse
@@ -11,36 +12,16 @@ from sklearn.cluster import KMeans
 
 from transformers import pipeline
 
-question_generator = pipeline("text-generation", model="distilgpt2")
+# Replace the model from "distilgpt2" to "gpt2-medium" for better responses
+question_generator = pipeline("text-generation", model="gpt2-medium")
 
-'''
-CLUSTER_QUESTIONS = {0: [
-        "What specifically would success look like for you?",
-        "How will you know when you've achieved that?",
-        "What outcome are you hoping for?"
-    ],
-
-    1: [
-        "What assumptions are you making about that?",
-        "Is there another way to look at this?",
-        "What evidence do you have that supports your thinking?"
-    ],
-    2: [
-        "What do you love about this?",
-        "What excites you most about this?",
-        "What keeps you motivated here?"
-    ]
-}
-'''
 app = FastAPI(title="Socratic Coach MVP")
 
-# In-memory storage for MVP
 sessions = {}
 
 vectorizer = None
 kmeans = None
 NUM_CLUSTERS = 3
-
 
 DB_PATH = "user_messages.db"
 
@@ -100,9 +81,17 @@ def get_cluster_label(user_msg):
     return kmeans.predict(X)[0]
 
 def generate_question(user_msg):
-    prompt = f'Ask a Socratic question about: {user_msg}\nQuestion:'
+    prompt = (
+        "You are a Socratic coach. Respond with a thoughtful question to help the user reflect deeper.\n"
+        f"User: {user_msg}\nCoach:"
+    )
     result = question_generator(prompt, max_length=50, num_return_sequences=1)
-    return result[0]['generated_text'].split("Question:")[-1].strip()
+    # Ensure the output is a question and not just a fragment
+    output = result[0]['generated_text'].split("Coach:")[-1].strip()
+    # If the output doesn't end with a question mark, add a generic Socratic question
+    if not output.endswith("?"):
+        output += " What makes you feel that way?"
+    return output
 
 @app.post("/turn", response_model=TurnResponse)
 async def create_turn(request: TurnRequest):
@@ -110,20 +99,17 @@ async def create_turn(request: TurnRequest):
     save_user_message(request.session_id, user_msg)
     question = generate_question(user_msg)
     next_phase = "contextual"
-    # Ensure AI-generated question and next_phase are valid
-    if not question or not isinstance(question, str) or question.strip() == "":
-        question = "Can you tell me more about your thoughts?"
-    if not next_phase or not isinstance(next_phase, str):
-        next_phase = "clarify"
+    cluster = get_cluster_label(user_msg)
+
     if request.session_id not in sessions:
         sessions[request.session_id] = []
+    asked_questions = {entry["ai"] for entry in sessions[request.session_id]}
     sessions[request.session_id].append({
         "user": request.user_msg,
         "ai": question
     })
     return TurnResponse(question=question, next_phase=next_phase)
 
-"""
 @app.post("/sessions")
 async def create_session():
     session_id = str(uuid.uuid4())
@@ -153,4 +139,6 @@ async def get_username(session_id: str):
         return {"session_id": session_id, "username": row[0]}
     else:
         return {"session_id": session_id, "username": None}
-"""
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="127.0.0.1", port=8000, reload=True)
