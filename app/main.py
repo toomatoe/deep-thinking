@@ -3,6 +3,7 @@ import random
 import sqlite3
 import uuid
 
+
 import uvicorn
 from fastapi import FastAPI, Body
 from app.models import TurnRequest, TurnResponse
@@ -11,7 +12,8 @@ from sklearn.cluster import KMeans
 
 from transformers import pipeline
 
-question_generator = pipeline("text-generation", model="distilgpt2")
+# Replace the model from "distilgpt2" to "gpt2-medium" for better responses
+question_generator = pipeline("text-generation", model="gpt2-medium")
 
 app = FastAPI(title="Socratic Coach MVP")
 
@@ -79,9 +81,17 @@ def get_cluster_label(user_msg):
     return kmeans.predict(X)[0]
 
 def generate_question(user_msg):
-    prompt = f'Ask a Socratic question about: {user_msg}\nQuestion:'
+    prompt = (
+        "You are a Socratic coach. Respond with a thoughtful question to help the user reflect deeper.\n"
+        f"User: {user_msg}\nCoach:"
+    )
     result = question_generator(prompt, max_length=50, num_return_sequences=1)
-    return result[0]['generated_text'].split("Question:")[-1].strip()
+    # Ensure the output is a question and not just a fragment
+    output = result[0]['generated_text'].split("Coach:")[-1].strip()
+    # If the output doesn't end with a question mark, add a generic Socratic question
+    if not output.endswith("?"):
+        output += " What makes you feel that way?"
+    return output
 
 @app.post("/turn", response_model=TurnResponse)
 async def create_turn(request: TurnRequest):
@@ -129,3 +139,6 @@ async def get_username(session_id: str):
         return {"session_id": session_id, "username": row[0]}
     else:
         return {"session_id": session_id, "username": None}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="127.0.0.1", port=8000, reload=True)
