@@ -12,32 +12,14 @@ from sklearn.cluster import KMeans
 from transformers import pipeline
 
 question_generator = pipeline("text-generation", model="distilgpt2")
-CLUSTER_QUESTIONS = {0: [
-        "What specifically would success look like for you?",
-        "How will you know when you've achieved that?",
-        "What outcome are you hoping for?"
-    ],
 
-    1: [
-        "What assumptions are you making about that?",
-        "Is there another way to look at this?",
-        "What evidence do you have that supports your thinking?"
-    ],
-    2: [
-        "What do you love about this?",
-        "What excites you most about this?",
-        "What keeps you motivated here?"
-    ]
-}
 app = FastAPI(title="Socratic Coach MVP")
 
-# In-memory storage for MVP
 sessions = {}
 
 vectorizer = None
 kmeans = None
 NUM_CLUSTERS = 3
-
 
 DB_PATH = "user_messages.db"
 
@@ -106,45 +88,18 @@ async def create_turn(request: TurnRequest):
     user_msg = request.user_msg.lower()
     save_user_message(request.session_id, user_msg)
     question = generate_question(user_msg)
-    next_phase = "contextual"  # Or set this based on your logic
+    next_phase = "contextual"
     cluster = get_cluster_label(user_msg)
 
-    # Track questions already asked in this session
     if request.session_id not in sessions:
         sessions[request.session_id] = []
     asked_questions = {entry["ai"] for entry in sessions[request.session_id]}
-"""
-    if cluster in CLUSTER_QUESTIONS:
-        possible_questions = [q for q in CLUSTER_QUESTIONS[cluster] if q not in asked_questions]
-        if not possible_questions:
-            # If all questions have been asked, allow repeats
-            possible_questions = CLUSTER_QUESTIONS[cluster]
-        question = random.choice(possible_questions)
-        if cluster == 0:
-            next_phase = "clarify"
-        elif cluster == 1:
-            next_phase = "assumptions"
-        elif cluster == 2:
-            next_phase = "appreciate"
-    else:
-        if "want" in user_msg or "goal" in user_msg:
-            question = "What specifically would success look like?"
-            next_phase = "clarify"
-        elif "because" in user_msg or "think" in user_msg:
-            question = "What assumptions are you making about that?"
-            next_phase = "assumptions"
-        elif "love" in user_msg or "like" in user_msg:
-            question = "What do you love about this?"
-            next_phase = "appreciate"
-        else:
-            question = "What do you mean by that exactly?"
-            next_phase = "clarify"
     sessions[request.session_id].append({
         "user": request.user_msg,
         "ai": question
     })
     return TurnResponse(question=question, next_phase=next_phase)
-"""
+
 @app.post("/sessions")
 async def create_session():
     session_id = str(uuid.uuid4())
